@@ -155,18 +155,22 @@ public class c1_Introduction extends IntroductionBase {
         CopyOnWriteArrayList<String> companyList = new CopyOnWriteArrayList<>();
 
         fortuneTop5()
-        //todo: change this line only
-            .doOnNext(companyList::add)
-            .onErrorStop()
-            .doOnComplete(new Runnable() {
+            .subscribe(companyList::add, error -> {}, () -> serviceCallCompleted.set(true))    //todo: change this line only
 
-                @Override
-                public void run() {
-                    serviceCallCompleted.set(true);
-                }
+            // -- ORIGINAL SOLUTION --
+            // did not know that subscribe had multiple contracts
+
+            // .doOnNext(companyList::add)
+            // .onErrorStop()
+            // .doOnComplete(new Runnable() {
+
+            //     @Override
+            //     public void run() {
+            //         serviceCallCompleted.set(true);
+            //     }
                 
-            })
-            .subscribe()
+            // })
+            // .subscribe()
         ;
 
         Thread.sleep(1000);
