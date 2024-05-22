@@ -40,8 +40,8 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
         Hooks.enableContextLossTracking(); //used for testing - detects if you are cheating!
 
         //todo: feel free to change code as you need
-        Mono<String> currentUserMono = getCurrentUser();
-        Mono<String> currentUserEmail = currentUserMono.flatMap(user -> getUserEmail(user));
+        Mono<String> currentUserEmail = getCurrentUser()
+            .flatMap(this::getUserEmail);
 
         //don't change below this line
         StepVerifier.create(currentUserEmail)
@@ -170,11 +170,11 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
     @Test
     public void mail_box_switcher() {
         //todo: feel free to change code as you need
-        Flux<Message> myMail = mailBoxPrimary().switchOnFirst((signal, flux) -> {
-            if(signal.hasValue()){
-                if(signal.get().metaData.equals("spam")) return mailBoxSecondary();
+        Flux<Message> myMail = mailBoxPrimary().switchOnFirst((first, mailBoxPrimary) -> {
+            if(first.hasValue()){
+                if(first.get().metaData.equals("spam")) return mailBoxSecondary();
             }
-            return flux;
+            return mailBoxPrimary;
         });
 
         //don't change below this line
@@ -197,8 +197,7 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
     public void instant_search() {
         //todo: feel free to change code as you need
         Flux<String> suggestions = userSearchInput()
-                .switchMap(s -> autoComplete(s))
-                ;
+                .switchMap(this::autoComplete);
 
         //don't change below this line
         StepVerifier.create(suggestions)
@@ -253,7 +252,7 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
         //todo: feel free to change code as you need
         Flux<String> committedTasksIds = tasksToExecute()
             .flatMapSequential(task -> task)
-            .doOnNext(task -> commitTask(task));
+            .doOnNext(this::commitTask);
 
         //don't change below this line
         StepVerifier.create(committedTasksIds)
@@ -295,7 +294,7 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
     @Test
     public void car_factory() {
         //todo: feel free to change code as you need
-        Flux<Car> producedCars = Flux.zip(carChassisProducer(), carEngineProducer()).cast(Car.class);
+        Flux<Car> producedCars = carChassisProducer().zipWith(carEngineProducer(), Car::new);
 
         //don't change below this line
         StepVerifier.create(producedCars)
@@ -316,12 +315,11 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
 
     //todo: implement this method based on instructions
     public Mono<String> chooseSource() {
-        return Mono.just(sourceRef.get())
-            .flatMap(source -> {
-                if(source.equals("A")){
+        return Mono.defer(() -> {
+                if(sourceRef.get().equals("A")){
                     return sourceA();
                 }
-                if(source.equals("B")){
+                if(sourceRef.get().equals("B")){
                     return sourceB();
                 }
                 else{
@@ -360,8 +358,8 @@ public class c6_CombiningPublishers extends CombiningPublishersBase {
         //todo: feel free to change code as you need
         Flux<String> stream = Flux.usingWhen(
             StreamingConnection.startStreaming(),
-            Function.identity(),
-            i -> StreamingConnection.closeConnection());
+            i -> i,
+            s -> StreamingConnection.closeConnection());
 
         //don't change below this line
         StepVerifier.create(stream)
