@@ -6,13 +6,16 @@ import reactor.core.Exceptions;
 import reactor.core.Scannable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.ParallelFlux;
 import reactor.core.scheduler.NonBlocking;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
 import java.time.Duration;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Flow.Subscriber;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -48,7 +51,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
         long threadId = Thread.currentThread().getId();
         Flux<String> notifications = readNotifications()
                 .doOnNext(System.out::println)
-                //todo: change this line only
+                .delayElements(Duration.ofSeconds(1))
                 ;
 
         StepVerifier.create(notifications
@@ -77,8 +80,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     public void ready_set_go() {
         //todo: feel free to change code as you need
         Flux<String> tasks = tasks()
-                .flatMap(Function.identity());
-        semaphore();
+                .concatMap(t -> t.delaySubscription(semaphore()));
 
         //don't change code below
         StepVerifier.create(tasks)
@@ -104,7 +106,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
                                   assert NonBlocking.class.isAssignableFrom(Thread.currentThread().getClass());
                                   System.out.println("Task executing on: " + currentThread.getName());
                               })
-                              //todo: change this line only
+                              .subscribeOn(Schedulers.parallel())
                               .then();
 
         StepVerifier.create(task)
@@ -121,7 +123,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
         BlockHound.install(); //don't change this line
 
         Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall)
-                              .subscribeOn(Schedulers.single())//todo: change this line only
+                              .subscribeOn(Schedulers.boundedElastic())//todo: change this line only
                               .then();
 
         StepVerifier.create(task)
@@ -134,10 +136,14 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     @Test
     public void free_runners() {
         //todo: feel free to change code as you need
-        Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall);
+        Scheduler s = Schedulers.boundedElastic();
+
+        Mono<Void> task = Mono.fromRunnable(ExecutionControlBase::blockingCall)
+            .subscribeOn(s)
+            .then();
 
         Flux<Void> taskQueue = Flux.just(task, task, task)
-                                   .concatMap(Function.identity());
+                                   .flatMap(t -> t, 3);
 
         //don't change code below
         Duration duration = StepVerifier.create(taskQueue)
@@ -154,7 +160,7 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     public void sequential_free_runners() {
         //todo: feel free to change code as you need
         Flux<String> tasks = tasks()
-                .flatMap(Function.identity());
+                .flatMapSequential(Function.identity(), 3);
         ;
 
         //don't change code below
@@ -175,10 +181,15 @@ public class c9_ExecutionControl extends ExecutionControlBase {
     @Test
     public void event_processor() {
         //todo: feel free to change code as you need
+        Scheduler s = Schedulers.parallel();
+
         Flux<String> eventStream = eventProcessor()
+                .parallel()
+                .runOn(s)
                 .filter(event -> event.metaData.length() > 0)
                 .doOnNext(event -> System.out.println("Mapping event: " + event.metaData))
                 .map(this::toJson)
+                .sequential()
                 .concatMap(n -> appendToStore(n).thenReturn(n));
 
         //don't change code below
