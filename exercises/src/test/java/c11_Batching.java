@@ -52,9 +52,12 @@ public class c11_Batching extends BatchingBase {
         //todo: implement your changes here
         Flux<Void> processCommands = inputCommandStream()
             .groupBy(c -> c.getAggregateId())
-            .parallel()
-            .flatMap(cg -> cg.flatMap(this::sendCommand))
-            .sequential();
+            .flatMap(cg -> cg.concatMap(this::sendCommand));    //flatmap operates in parallel
+
+            // this is what I did originally - i didnt actually expect it to work, but it did so i moved on
+            // .parallel()
+            // .flatMap(cg -> cg.flatMap(this::sendCommand))
+            // .sequential();
 
         //do not change the code below
         Duration duration = StepVerifier.create(processCommands)
